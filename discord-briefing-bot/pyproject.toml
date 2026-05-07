@@ -3,7 +3,7 @@ name = "discord-briefing-bot"
 version = "0.1.0"
 description = "Personalized AI news briefings delivered through Discord and email."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<4"
 dependencies = [
     "agno>=2.5.0",
     "apscheduler>=3.10.4",
@@ -13,6 +13,7 @@ dependencies = [
     "pydantic>=2.8.0",
     "python-dotenv>=1.0.1",
     "pytz>=2024.1",
+    "openai (>=2.36.0,<3.0.0)",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +25,9 @@ dev = [
 
 [project.scripts]
 briefing-bot = "briefing_bot.main:run"
+
+[tool.poetry]
+packages = [{ include = "briefing_bot", from = "src" }]
 
 [build-system]
 requires = ["hatchling"]

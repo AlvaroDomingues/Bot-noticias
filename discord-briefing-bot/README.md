@@ -41,10 +41,22 @@ uv sync --extra dev
 Com Poetry:
 
 ```bash
-poetry install --with dev
+poetry install --extras dev
 ```
 
 ## Como Executar
+
+Com Poetry:
+
+```bash
+poetry run briefing-bot
+```
+
+Ou:
+
+```bash
+poetry run python -m briefing_bot
+```
 
 Com `uv`:
 
@@ -52,7 +64,7 @@ Com `uv`:
 uv run python -m briefing_bot
 ```
 
-Ou com o Python do ambiente virtual:
+Ou com o Python do ambiente virtual ativado:
 
 ```bash
 python -m briefing_bot
