@@ -25,7 +25,7 @@ class FakeNewsService:
     """News service fake with deterministic empty results."""
 
     async def fetch_news(
-        self,
+        self, 
         _topic: str,
         _keywords: list[str],
         _max_results: int,
