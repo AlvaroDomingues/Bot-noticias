@@ -1,5 +1,6 @@
 """External service integrations for news, email, and scheduling."""
 
+from briefing_bot.services.discord_webhook_service import DiscordWebhookService
 from briefing_bot.services.email_service import EmailServiceProtocol, SMTPEmailService
 from briefing_bot.services.news_service import (
     AgnoWebSearchNewsService,
@@ -16,6 +17,7 @@ __all__ = [
     "AgnoWebSearchNewsService",
     "BriefingScheduler",
     "CompositeNewsService",
+    "DiscordWebhookService",
     "EmailServiceProtocol",
     "MessageSenderProtocol",
     "NewsAPIService",

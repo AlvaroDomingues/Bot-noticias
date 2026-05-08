@@ -12,6 +12,7 @@ class Settings:
     """Runtime settings loaded from environment variables."""
 
     discord_bot_token: str
+    discord_webhook_url: str
     openai_api_key: str
     agno_model_id: str
     news_api_key: str
@@ -36,6 +37,7 @@ def load_settings() -> Settings:
     load_dotenv()
     return Settings(
         discord_bot_token=_env("DISCORD_BOT_TOKEN"),
+        discord_webhook_url=_env("DISCORD_WEBHOOK_URL"),
         openai_api_key=_env("OPENAI_API_KEY"),
         agno_model_id=_env("AGNO_MODEL_ID", "gpt-4.1-mini"),
         news_api_key=_env("NEWS_API_KEY"),

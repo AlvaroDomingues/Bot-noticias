@@ -1,5 +1,6 @@
 """State machine for Discord onboarding conversations."""
 
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
@@ -17,6 +18,7 @@ class OnboardingState(StrEnum):
     MAX_RESULTS = auto()
     EMAIL = auto()
     CHANNEL = auto()
+    SCHEDULE = auto()
     CONFIRMATION = auto()
 
 
@@ -41,6 +43,8 @@ class OnboardingSession:
     max_news_per_topic: int = 5
     email: str = ""
     discord_channel_id: int = 0
+    briefing_hour: int = 7
+    briefing_minute: int = 0
 
 
 Handler = Callable[[OnboardingSession, str], Awaitable[ConversationReply]]
@@ -83,7 +87,7 @@ class ConversationManager:
         Returns:
             First onboarding question.
         """
-        self._sessions[user_id] = OnboardingSession(user_id=user_id)
+        self._sessions[user_id] = self._new_session(user_id)
         return _topics_question()
 
     def has_active_session(self, user_id: int) -> bool:
@@ -107,10 +111,25 @@ class ConversationManager:
         Returns:
             Reply to send back to Discord.
         """
-        session = self._sessions.get(user_id) or OnboardingSession(user_id=user_id)
+        session = self._sessions.get(user_id) or self._new_session(user_id)
         self._sessions[user_id] = session
         handler = self._handlers[session.state]
         return await handler(session, message)
+
+    def _new_session(self, user_id: int) -> OnboardingSession:
+        """Build a new onboarding session using configured defaults.
+
+        Args:
+            user_id: Discord user id.
+
+        Returns:
+            Fresh onboarding session.
+        """
+        return OnboardingSession(
+            user_id=user_id,
+            briefing_hour=self._default_hour,
+            briefing_minute=self._default_minute,
+        )
 
     def _build_handlers(self) -> dict[OnboardingState, Handler]:
         """Build the state-handler lookup table.
@@ -124,6 +143,7 @@ class ConversationManager:
             OnboardingState.MAX_RESULTS: self._handle_max_results,
             OnboardingState.EMAIL: self._handle_email,
             OnboardingState.CHANNEL: self._handle_channel,
+            OnboardingState.SCHEDULE: self._handle_schedule,
             OnboardingState.CONFIRMATION: self._handle_confirmation,
         }
 
@@ -229,6 +249,27 @@ class ConversationManager:
         if channel_id is None:
             return ConversationReply(_channel_retry())
         session.discord_channel_id = channel_id
+        session.state = OnboardingState.SCHEDULE
+        return ConversationReply(_schedule_question())
+
+    async def _handle_schedule(
+        self,
+        session: OnboardingSession,
+        message: str,
+    ) -> ConversationReply:
+        """Handle the briefing schedule collection state.
+
+        Args:
+            session: Current onboarding session.
+            message: User message content.
+
+        Returns:
+            Next conversation reply.
+        """
+        schedule = _parse_schedule(message)
+        if schedule is None:
+            return ConversationReply(_schedule_retry())
+        session.briefing_hour, session.briefing_minute = schedule
         session.state = OnboardingState.CONFIRMATION
         return ConversationReply(_confirmation_message(session))
 
@@ -264,7 +305,7 @@ class ConversationManager:
         Returns:
             Reply with the first question again.
         """
-        self._sessions[user_id] = OnboardingSession(user_id=user_id)
+        self._sessions[user_id] = self._new_session(user_id)
         return ConversationReply(
             f"Sem problemas. Vamos refazer.\n\n{_topics_question()}"
         )
@@ -286,8 +327,8 @@ class ConversationManager:
             email=session.email,
             discord_channel_id=session.discord_channel_id,
             timezone=self._default_timezone,
-            briefing_hour=self._default_hour,
-            briefing_minute=self._default_minute,
+            briefing_hour=session.briefing_hour,
+            briefing_minute=session.briefing_minute,
         )
 
 
@@ -345,7 +386,7 @@ def _max_results_question() -> str:
     Returns:
         Question text for Discord.
     """
-    return "Qual o número máximo de notícias por tópico? Padrão: 5"
+    return "Qual o número máximo de notícias por tópico?"
 
 
 def _email_question() -> str:
@@ -386,6 +427,26 @@ def _channel_retry() -> str:
     )
 
 
+def _schedule_question() -> str:
+    """Build the preferred briefing time question.
+
+    Returns:
+        Question text for Discord.
+    """
+    return (
+        "Que horas prefere receber o seu briefing por e-mail e no canal do Discord?"
+    )
+
+
+def _schedule_retry() -> str:
+    """Build the retry message for schedule extraction.
+
+    Returns:
+        Retry prompt for Discord.
+    """
+    return "Não consegui entender o horário. Envie algo como: 07:30 ou 7:30 pm"
+
+
 def _confirmation_message(session: OnboardingSession) -> str:
     """Build the confirmation message with all preferences.
 
@@ -414,6 +475,7 @@ def _session_summary(session: OnboardingSession) -> list[str]:
         f"- Máximo por tópico: {session.max_news_per_topic}",
         f"- E-mail: {session.email}",
         f"- Canal Discord: {session.discord_channel_id}",
+        f"- Horário: {session.briefing_hour:02d}:{session.briefing_minute:02d}",
     ]
 
 
@@ -424,3 +486,34 @@ def _saved_message() -> str:
         Success message for Discord.
     """
     return "Preferências salvas. Você receberá seus briefings automaticamente."
+
+
+def _parse_schedule(message: str) -> tuple[int, int] | None:
+    """Parse a preferred briefing time from a user message.
+
+    Args:
+        message: User message content.
+
+    Returns:
+        Parsed hour and minute, or None when no valid time is found.
+    """
+    match = re.search(
+        r"\b(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?\s*(?P<period>am|pm)?\b",
+        message.strip(),
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    hour = int(match.group("hour"))
+    minute = int(match.group("minute") or 0)
+    period = (match.group("period") or "").lower()
+    if period:
+        if hour < 1 or hour > 12:
+            return None
+        if period == "pm" and hour != 12:
+            hour += 12
+        if period == "am" and hour == 12:
+            hour = 0
+    if hour > 23 or minute > 59:
+        return None
+    return hour, minute

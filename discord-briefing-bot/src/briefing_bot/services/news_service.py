@@ -140,7 +140,7 @@ class AgnoWebSearchNewsService:
         from agno.tools.websearch import WebSearchTools
 
         return Agent(
-            model=OpenAIResponses(id=model_id),
+            model=OpenAIResponses(id=model_id, max_retries=0),
             tools=[WebSearchTools(enable_search=False, enable_news=True)],
             instructions=[_WEB_SEARCH_INSTRUCTIONS],
         )

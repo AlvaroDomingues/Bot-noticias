@@ -63,4 +63,7 @@ class BaseAgent(ABC):
         from agno.agent import Agent
         from agno.models.openai import OpenAIResponses
 
-        return Agent(model=OpenAIResponses(id=model_id), instructions=instructions)
+        return Agent(
+            model=OpenAIResponses(id=model_id, max_retries=0),
+            instructions=instructions,
+        )

@@ -31,6 +31,7 @@ async def test_conversation_collects_and_saves_preferences() -> None:
     await manager.handle_message(42, "3")
     await manager.handle_message(42, "User@Example.com")
     await manager.handle_message(42, "<#1234567890>")
+    await manager.handle_message(42, "8:30")
     reply = await manager.handle_message(42, "sim")
     saved = await repository.get(42)
 
@@ -38,6 +39,8 @@ async def test_conversation_collects_and_saves_preferences() -> None:
     assert saved is not None
     assert saved.max_news_per_topic == 3
     assert saved.discord_channel_id == 1234567890
+    assert saved.briefing_hour == 8
+    assert saved.briefing_minute == 30
     path.unlink(missing_ok=True)
 
 

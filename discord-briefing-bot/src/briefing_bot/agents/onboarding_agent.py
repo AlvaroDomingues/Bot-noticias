@@ -79,6 +79,9 @@ class OnboardingAgent(BaseAgent):
         Returns:
             Topic names found in the response.
         """
+        local_topics = _clean_items(_split_items(message))
+        if local_topics:
+            return local_topics
         result = await self._safe_extract(_topic_prompt(message), TopicExtraction)
         topics = result.topics if result else _split_items(message)
         return _clean_items(topics)
@@ -93,6 +96,9 @@ class OnboardingAgent(BaseAgent):
         Returns:
             Priority keywords found in the response.
         """
+        local_keywords = _clean_items(_split_items(message))
+        if local_keywords:
+            return local_keywords
         result = await self._safe_extract(
             _keyword_prompt(topic, message), KeywordExtraction
         )
@@ -109,6 +115,9 @@ class OnboardingAgent(BaseAgent):
         Returns:
             Article count between 1 and 20.
         """
+        local_value = _first_int(message)
+        if local_value is not None:
+            return min(max(local_value, 1), 20)
         result = await self._safe_extract(
             _max_results_prompt(message), MaxResultsExtraction
         )
@@ -124,6 +133,9 @@ class OnboardingAgent(BaseAgent):
         Returns:
             Email address or None when not found.
         """
+        local_email = _find_email(message)
+        if local_email:
+            return local_email
         result = await self._safe_extract(_email_prompt(message), EmailExtraction)
         return result.email if result and result.email else _find_email(message)
 
@@ -136,6 +148,9 @@ class OnboardingAgent(BaseAgent):
         Returns:
             Discord channel id or None when not found.
         """
+        local_channel_id = _find_channel_id(message)
+        if local_channel_id is not None:
+            return local_channel_id
         result = await self._safe_extract(_channel_prompt(message), ChannelExtraction)
         return (
             result.channel_id
@@ -152,6 +167,10 @@ class OnboardingAgent(BaseAgent):
         Returns:
             True when the user confirmed the preferences.
         """
+        if _looks_affirmative(message):
+            return True
+        if _looks_negative(message):
+            return False
         result = await self._safe_extract(
             _confirmation_prompt(message), ConfirmationExtraction
         )
@@ -323,6 +342,19 @@ def _looks_affirmative(message: str) -> bool:
     """
     normalized = message.strip().lower()
     return normalized in {"s", "sim", "ok", "confirmo", "confirmar", "yes", "y"}
+
+
+def _looks_negative(message: str) -> bool:
+    """Check whether a message looks like a negative answer.
+
+    Args:
+        message: User response.
+
+    Returns:
+        True when the answer appears negative.
+    """
+    normalized = message.strip().lower()
+    return normalized in {"n", "não", "nao", "no"}
 
 
 _INSTRUCTIONS = [

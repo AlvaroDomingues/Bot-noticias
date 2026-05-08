@@ -1,6 +1,7 @@
 """Daily scheduling and briefing delivery orchestration."""
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Protocol
@@ -15,6 +16,8 @@ from briefing_bot.repositories import UserPreferencesRepositoryProtocol
 from briefing_bot.services.email_service import EmailServiceProtocol
 from briefing_bot.services.news_service import NewsServiceProtocol
 from briefing_bot.services.retry import retry_async
+
+logger = logging.getLogger(__name__)
 
 
 class MessageSenderProtocol(Protocol):
@@ -176,8 +179,12 @@ class BriefingScheduler:
             preferences: User delivery preferences.
             briefing: Generated briefing.
         """
-        await self._send_discord(preferences, briefing.content)
-        await self._send_email(preferences, briefing.content)
+        results = await asyncio.gather(
+            self._send_discord(preferences, briefing.content),
+            self._send_email(preferences, briefing.content),
+            return_exceptions=True,
+        )
+        _handle_delivery_results(results)
 
     async def _send_discord(self, preferences: UserPreferences, content: str) -> None:
         """Send briefing content to Discord with retry.
@@ -273,6 +280,24 @@ def _email_operation(
         Async operation suitable for retry.
     """
     return lambda: service.send_email(preferences.email, subject, content)
+
+
+def _handle_delivery_results(results: list[object]) -> None:
+    """Log partial delivery failures and raise only when all channels failed.
+
+    Args:
+        results: Delivery results from Discord and email, in that order.
+    """
+    failures = [
+        (channel, result)
+        for channel, result in zip(("discord", "email"), results, strict=True)
+        if isinstance(result, Exception)
+    ]
+    for channel, failure in failures:
+        logger.warning("%s delivery failed: %s", channel, failure)
+    if len(failures) == len(results):
+        msg = "All briefing delivery channels failed."
+        raise RuntimeError(msg) from failures[0][1]
 
 
 async def _gather_articles(

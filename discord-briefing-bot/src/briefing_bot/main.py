@@ -17,6 +17,8 @@ from briefing_bot.services import (
     AgnoWebSearchNewsService,
     BriefingScheduler,
     CompositeNewsService,
+    DiscordWebhookService,
+    MessageSenderProtocol,
     NewsAPIService,
     NewsServiceProtocol,
     SMTPEmailService,
@@ -41,12 +43,13 @@ async def main() -> None:
         briefing_agent = BriefingAgent(settings.agno_model_id)
         conversation = _build_conversation(settings, repository, onboarding_agent)
         discord_bot = DiscordBriefingBot(settings, conversation, repository)
+        message_sender = _build_message_sender(settings, discord_bot)
         scheduler = BriefingScheduler(
             repository,
             news_service,
             briefing_agent,
             email_service,
-            discord_bot,
+            message_sender,
         )
         await _start_application(discord_bot, scheduler)
 
@@ -171,6 +174,24 @@ def _build_email_service(settings: Settings) -> SMTPEmailService:
         settings.smtp_password,
         settings.email_from,
     )
+
+
+def _build_message_sender(
+    settings: Settings,
+    discord_bot: DiscordBriefingBot,
+) -> MessageSenderProtocol:
+    """Build the Discord delivery service.
+
+    Args:
+        settings: Loaded application settings.
+        discord_bot: Bot fallback for channel-based delivery.
+
+    Returns:
+        Webhook sender when configured, otherwise the Discord bot sender.
+    """
+    if settings.discord_webhook_url:
+        return DiscordWebhookService(settings.discord_webhook_url)
+    return discord_bot
 
 
 def _build_conversation(
