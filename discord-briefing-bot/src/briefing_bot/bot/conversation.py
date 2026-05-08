@@ -312,7 +312,7 @@ def _topics_question() -> str:
     Returns:
         Question text for Discord.
     """
-    return "Quais tópicos você quer acompanhar? Ex: tecnologia, política, economia"
+    return "Quais tópicos você quer acompanhar?"
 
 
 def _topics_retry() -> str:
@@ -336,7 +336,7 @@ def _keyword_question(session: OnboardingSession) -> str:
         Question text for Discord.
     """
     topic = session.topics[session.current_topic_index]
-    return f"Para '{topic}', quais palavras-chave priorizar? Ex: IA, Python, startups"
+    return f"Para '{topic}', quais palavras-chave priorizar?"
 
 
 def _max_results_question() -> str:
